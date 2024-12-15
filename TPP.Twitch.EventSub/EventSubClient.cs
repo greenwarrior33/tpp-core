@@ -18,7 +18,7 @@ internal record WebsocketChangeover(ClientWebSocket NewWebSocket, SessionWelcome
 public class EventSubClient
 {
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-    private static readonly Duration KeepAliveGrace = Duration.FromSeconds(3);
+    private static readonly Duration KeepAliveGrace = Duration.FromSeconds(5);
     private static readonly Duration MaxMessageAge = Duration.FromMinutes(10);
     private static readonly Task<WebsocketChangeover> NoChangeoverTask =
         new TaskCompletionSource<WebsocketChangeover>().Task; // a task that never gets completed
@@ -153,6 +153,7 @@ public class EventSubClient
             if (firstFinishedTask == changeoverTask)
             {
                 WebsocketChangeover changeover = await changeoverTask;
+                _logger.LogDebug("Finished WebSocket Changeover, welcome message: {Welcome}", changeover.Welcome);
                 _keepaliveTimeSeconds = changeover.Welcome.Payload.Session.KeepaliveTimeoutSeconds;
                 lastMessageTimestamp = changeover.Welcome.Metadata.MessageTimestamp;
                 changeoverTask = NoChangeoverTask;
@@ -236,6 +237,7 @@ public class EventSubClient
                 var reconnectUri = new Uri(reconnect.Payload.Session
                     .ReconnectUrl ?? throw new ProtocolViolationException(
                     "twitch must provide a reconnect URL in a reconnect message"));
+                _logger.LogDebug("Initiating WebSocket Changeover to new Uri: {ReconnectUri}", reconnectUri);
                 changeoverTask = PerformChangeover(reconnectUri, cancellationToken);
             }
             else if (message is Revocation revocation)
